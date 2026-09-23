@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>ภารกิจตุ๊กตาแม่ลูกดก</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500;600&family=Sarabun:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* ===== ตั้งค่า: วาง URL ของ Apps Script Web App ที่นี่ ===== */
+:root{
+  --bg:#fff7ec; --panel:#ffffff; --ink:#3b2a1e; --muted:#8a7565; --line:#f0dcc6;
+  --accent:#e2574c; --accent2:#ffb238; --ok:#2fae66;
+  --b-move:#4c97ff; --b-turn:#9966ff; --b-pick:#ff6680; --b-loop:#ffab19;
+  --cell:#fdf1df; --cell2:#f8e6cc;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font-family:'Sarabun',system-ui,sans-serif;font-size:16px;
+  background-image:radial-gradient(#f6e2c8 1.2px,transparent 1.2px);background-size:22px 22px}
+h1,h2,h3,button,.blk,.mitr{font-family:'Mitr','Sarabun',sans-serif}
+button{cursor:pointer;border:0;border-radius:12px;font-size:16px;padding:10px 16px;font-weight:500}
+.btn{background:var(--accent);color:#fff;box-shadow:0 4px 0 #b53d34}
+.btn:active{transform:translateY(3px);box-shadow:0 1px 0 #b53d34}
+.btn.alt{background:#fff;color:var(--ink);box-shadow:0 4px 0 var(--line);border:2px solid var(--line)}
+.btn.go{background:var(--ok);box-shadow:0 4px 0 #1f8049}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.screen{display:none;min-height:100%;padding:16px}
+.screen.show{display:block}
+.card{background:var(--panel);border-radius:20px;box-shadow:0 6px 0 var(--line),0 10px 30px rgba(120,70,20,.08);padding:20px}
+
+/* ---------- Login ---------- */
+#login .card{max-width:440px;margin:4vh auto 0;text-align:center}
+.logo{display:flex;justify-content:center;align-items:flex-end;gap:2px;height:110px;margin-bottom:6px}
+#login h1{margin:4px 0 2px;font-size:28px;color:var(--accent)}
+#login p{margin:0 0 16px;color:var(--muted)}
+.field{text-align:left;margin-bottom:12px}
+.field label{display:block;font-weight:600;margin-bottom:4px}
+.field input{width:100%;font:inherit;font-size:18px;padding:10px 12px;border:2px solid var(--line);border-radius:12px;background:#fffdf9}
+.field input:focus{outline:none;border-color:var(--accent2)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.err{color:var(--accent);min-height:22px;font-size:14px}
+
+/* ---------- Level select ---------- */
+.top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;max-width:1100px;margin:0 auto 14px}
+.top h2{margin:0;flex:1;font-size:22px}
+.who{background:#fff;border:2px solid var(--line);border-radius:999px;padding:6px 14px;font-size:14px}
+#levels{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px}
+.lv{background:#fff;border-radius:18px;padding:14px;text-align:left;box-shadow:0 5px 0 var(--line);border:2px solid var(--line);color:var(--ink);font-weight:400}
+.lv b{font-family:'Mitr';font-size:26px;color:var(--accent);display:block;line-height:1}
+.lv .t{font-family:'Mitr';font-size:16px;margin:4px 0}
+.lv .c{font-size:13px;color:var(--muted)}
+.lv .s{font-size:20px;letter-spacing:2px;margin-top:6px;color:#e3d3c2}
+.lv .s .on{color:#ffb400}
+.lv.lock{opacity:.5;cursor:not-allowed}
+.lv.done{border-color:#bfe6cd}
+
+/* ---------- Game ---------- */
+#game{padding:10px}
+.gtop{display:flex;align-items:center;gap:8px;flex-wrap:wrap;max-width:1200px;margin:0 auto 10px}
+.gtop h2{margin:0;font-size:20px;flex:1;min-width:180px}
+.pill{background:#fff;border:2px solid var(--line);border-radius:999px;padding:5px 12px;font-size:14px;white-space:nowrap}
+.gwrap{max-width:1200px;margin:0 auto;display:grid;grid-template-columns:minmax(280px,440px) 1fr;gap:12px;align-items:start}
+@media (max-width:820px){.gwrap{grid-template-columns:1fr}}
+.hint{background:#fff8e1;border:2px dashed var(--accent2);border-radius:14px;padding:10px 12px;font-size:15px;margin-bottom:10px}
+#board{position:relative;display:grid;border-radius:16px;overflow:hidden;background:var(--cell2);border:4px solid #e9cfae;aspect-ratio:1/1;width:100%}
+.cell{position:relative;display:flex;align-items:center;justify-content:center;border:1px solid rgba(233,207,174,.6)}
+.cell.a{background:var(--cell)}.cell.b{background:var(--cell2)}
+.cell.wall{background:#cfe8b9}
+.cell .tree{font-size:min(7vw,34px);line-height:1}
+.dollcell{display:flex;align-items:flex-end;justify-content:center;height:88%;width:88%;position:relative;transition:opacity .3s,transform .3s}
+.dollcell svg{height:100%;width:auto}
+.dollcell .num{position:absolute;top:0;right:4%;background:#fff;border:2px solid var(--ink);border-radius:50%;width:20px;height:20px;font:600 12px/16px Mitr;text-align:center}
+.dollcell.got{opacity:0;transform:scale(.3) translateY(-30px)}
+#hero{position:absolute;display:flex;align-items:center;justify-content:center;transition:left .28s ease,top .28s ease;z-index:3;pointer-events:none}
+#hero .face{font-size:min(8vw,36px);line-height:1;filter:drop-shadow(0 2px 1px rgba(0,0,0,.25))}
+#hero .arr{position:absolute;inset:0;transition:transform .25s ease}
+#hero .arr::after{content:'';position:absolute;left:50%;top:-2px;transform:translateX(-50%);border:9px solid transparent;border-bottom:13px solid var(--accent);border-top:0}
+#hero.bump{animation:bump .35s}
+@keyframes bump{30%{transform:translateX(6px)}60%{transform:translateX(-6px)}}
+.bag{display:flex;align-items:flex-end;gap:6px;background:#fff;border-radius:14px;padding:8px 10px;margin-top:10px;border:2px solid var(--line);min-height:62px}
+.bag .lbl{font-size:13px;color:var(--muted);margin-right:4px;align-self:center}
+.bag svg{height:44px}
+.bag .ghost{opacity:.18;filter:grayscale(1)}
+
+.code{display:grid;grid-template-columns:190px 1fr;gap:10px;min-height:420px}
+@media (max-width:520px){.code{grid-template-columns:1fr}}
+.pal,.ws{background:#fff;border-radius:16px;border:2px solid var(--line);padding:10px}
+.pal h3,.ws h3{margin:0 0 8px;font-size:15px;color:var(--muted);font-weight:500;display:flex;justify-content:space-between}
+@media (max-width:520px){#palette{display:flex;flex-wrap:wrap;gap:6px}#palette .blk{margin:0}}
+.ws{position:relative;min-height:300px;background-color:#fbfaff;background-image:radial-gradient(#e4e0f5 1px,transparent 1px);background-size:16px 16px;overflow:auto;max-height:70vh}
+.ws .start{display:inline-block;background:var(--ok);color:#fff;border-radius:14px 14px 6px 6px;padding:6px 14px;font:500 15px Mitr;margin-bottom:2px}
+.blk{touch-action:none;user-select:none;-webkit-user-select:none;color:#fff;font-size:15px;border-radius:8px;padding:8px 12px;margin:0 0 3px;display:flex;align-items:center;gap:6px;cursor:grab;width:max-content;min-width:150px;box-shadow:0 3px 0 rgba(0,0,0,.18)}
+.blk.F{background:var(--b-move)}.blk.L,.blk.R{background:var(--b-turn)}.blk.P{background:var(--b-pick)}
+.blk.REP{background:var(--b-loop);flex-direction:column;align-items:stretch;padding:0;min-width:190px}
+.blk.REP .hd{display:flex;align-items:center;gap:6px;padding:8px 12px}
+.blk.REP .body{margin-left:16px;background:#fbfaff;min-height:34px;padding:4px 6px;border-radius:0 6px 6px 0}
+.blk.REP .ft{height:14px}
+.blk select{font:600 15px Mitr;border-radius:8px;border:0;padding:2px 4px;background:#fff;color:var(--ink)}
+#palette .blk{min-width:0;max-width:100%}
+.blk.run{outline:4px solid #ffe14d;outline-offset:1px}
+.blk.dis{opacity:.4;cursor:not-allowed}
+.slot{height:3px;border-radius:3px;margin:0}
+.ws.drag .slot{height:8px}
+.slot.on{background:#ffb400;height:10px!important;box-shadow:0 0 0 2px #fff}
+.ghostblk{position:fixed;z-index:50;pointer-events:none;opacity:.9;transform:rotate(-2deg)}
+.trash{position:absolute;right:10px;bottom:10px;font-size:13px;color:var(--muted)}
+.ctrl{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.ctrl .speed{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:14px}
+.msg{margin-top:10px;border-radius:12px;padding:10px 12px;font-weight:600;display:none}
+.msg.bad{display:block;background:#ffe9e6;color:#b3322a}
+.msg.info{display:block;background:#eaf3ff;color:#2463b3}
+
+/* ---------- Modal ---------- */
+.modal{position:fixed;inset:0;background:rgba(59,42,30,.45);display:none;align-items:center;justify-content:center;padding:16px;z-index:100}
+.modal.show{display:flex}
+.modal .card{max-width:460px;width:100%;text-align:center;max-height:90vh;overflow:auto}
+.bigstars{font-size:48px;letter-spacing:6px;color:#e3d3c2;margin:6px 0}
+.bigstars .on{color:#ffb400;display:inline-block;animation:pop .5s both}
+.bigstars .on:nth-child(2){animation-delay:.15s}.bigstars .on:nth-child(3){animation-delay:.3s}
+@keyframes pop{0%{transform:scale(0)}70%{transform:scale(1.3)}100%{transform:scale(1)}}
+.stat{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
+.stat div{background:var(--bg);border-radius:12px;padding:8px}
+.stat b{display:block;font:600 20px Mitr}
+.stat span{font-size:12px;color:var(--muted)}
+table{width:100%;border-collapse:collapse;font-size:14px;text-align:left}
+th,td{padding:7px 6px;border-bottom:1px solid var(--line)}
+th{font-family:Mitr;font-weight:500;color:var(--muted)}
+tr.me td{background:#fff3d6;font-weight:600}
+.small{font-size:13px;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<!-- ===== หน้าเข้าสู่ระบบ ===== -->
+<section id="login" class="screen show">
+  <div class="card">
+    <div class="logo" id="logo"></div>
+    <h1>ภารกิจตุ๊กตาแม่ลูกดก</h1>
+    <p>เรียงบล็อกคำสั่ง พาน้องไปเก็บตุ๊กตา<br>จาก<b>ตัวเล็กที่สุด</b>ไป<b>ตัวใหญ่ที่สุด</b>ให้ครบชุด</p>
+    <div class="field"><label for="inName">ชื่อ-นามสกุล</label><input id="inName" autocomplete="off" placeholder="เช่น ด.ญ.มะลิ ใจดี"></div>
+    <div class="row2">
+      <div class="field"><label for="inClass">ชั้น/ห้อง</label><input id="inClass" autocomplete="off" placeholder="เช่น ป.5/1"></div>
+      <div class="field"><label for="inNo">เลขที่</label><input id="inNo" type="number" inputmode="numeric" min="1" max="99" placeholder="เช่น 12"></div>
+    </div>
+    <div class="err" id="loginErr"></div>
+    <button class="btn" id="btnLogin" style="width:100%;font-size:18px">เริ่มภารกิจ ▶</button>
+  </div>
+</section>
+
+<!-- ===== หน้าเลือกด่าน ===== -->
+<section id="select" class="screen">
+  <div class="top">
+    <h2>🗺️ เลือกด่าน</h2>
+    <span class="who" id="whoTag"></span>
+    <button class="btn alt" id="btnBoard">🏆 อันดับคะแนน</button>
+    <button class="btn alt" id="btnLogout">เปลี่ยนผู้เล่น</button>
+  </div>
+  <div id="levels"></div>
+</section>
+
+<!-- ===== หน้าเล่นเกม ===== -->
+<section id="game" class="screen">
+  <div class="gtop">
+    <button class="btn alt" id="btnBack">◀ ด่าน</button>
+    <h2 id="lvTitle"></h2>
+    <span class="pill" id="pBlocks"></span>
+    <span class="pill" id="pTry"></span>
+    <span class="pill" id="pTime">⏱ 0:00</span>
+  </div>
+  <div class="gwrap">
+    <div>
+      <div class="hint" id="lvHint"></div>
+      <div id="board"></div>
+      <div class="bag" id="bag"></div>
+    </div>
+    <div>
+      <div class="code">
+        <div class="pal"><h3>บล็อกคำสั่ง <span>ลาก หรือ แตะ</span></h3><div id="palette"></div></div>
+        <div class="ws" id="ws"><h3>โปรแกรมของฉัน <span>ลากออกเพื่อลบ</span></h3><div class="start">🚩 เมื่อกดเริ่ม</div><div id="prog"></div></div>
+      </div>
+      <div class="ctrl">
+        <button class="btn go" id="btnRun">▶ เริ่ม</button>
+        <button class="btn alt" id="btnReset">↺ กลับจุดเริ่ม</button>
+        <button class="btn alt" id="btnClear">🗑 ล้างบล็อก</button>
+        <label class="speed">ความเร็ว <input type="range" id="speed" min="1" max="3" value="2"></label>
+      </div>
+      <div class="msg" id="msg"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== ผลการเล่น ===== -->
+<div class="modal" id="mWin"><div class="card">
+  <h2 style="margin:0;color:var(--ok)">ภารกิจสำเร็จ! 🎉</h2>
+  <div class="bigstars" id="winStars"></div>
+  <div id="winNote" class="small"></div>
+  <div class="stat">
+    <div><b id="wBlocks"></b><span>บล็อกที่ใช้</span></div>
+    <div><b id="wTry"></b><span>จำนวนครั้งที่ลอง</span></div>
+    <div><b id="wTime"></b><span>เวลาที่ใช้</span></div>
+  </div>
+  <div class="small" id="saveNote"></div>
+  <div class="ctrl" style="justify-content:center">
+    <button class="btn alt" id="wAgain">เล่นอีกครั้ง</button>
+    <button class="btn go" id="wNext">ด่านต่อไป ▶</button>
+  </div>
+</div></div>
+
+<!-- ===== อันดับคะแนน ===== -->
+<div class="modal" id="mBoard"><div class="card">
+  <h2 style="margin:0 0 6px">🏆 อันดับคะแนน</h2>
+  <div class="small" style="margin-bottom:8px">เรียงตามดาวรวม ถ้าเท่ากันดูจากเวลารวมที่น้อยกว่า</div>
+  <div id="boardBody">กำลังโหลด…</div>
+  <div class="ctrl" style="justify-content:center"><button class="btn" id="bClose">ปิด</button></div>
+</div></div>
+
+<script>
+/* ============================================================
+   ตั้งค่า: ใส่ URL ของ Google Apps Script Web App (ลงท้ายด้วย /exec)
+   ถ้าเว้นว่างไว้ เกมจะเล่นได้ แต่จะไม่บันทึกคะแนนลง Google Sheets
+   ============================================================ */
+const API_URL = '';
+
+/* ---------------- ข้อมูลด่าน ----------------
+   แผนที่: S = จุดเริ่ม  . = ทางเดิน  # = ต้นไม้  1-4 = ตุ๊กตา (1 เล็กที่สุด)
+   dir: 0 ขึ้น 1 ขวา 2 ลง 3 ซ้าย | target = จำนวนบล็อกสำหรับ 3 ดาว | max = จำกัดจำนวนบล็อก */
+const LEVELS = [
+ {t:'ก้าวแรก',c:'ลำดับขั้นตอน',map:['S...1'],dir:1,target:5,max:null,blocks:['F','P'],
+  hint:'พาน้องเดินไปถึงตุ๊กตา แล้วใช้บล็อก <b>เก็บตุ๊กตา</b> เมื่อยืนอยู่บนช่องนั้น'},
+ {t:'เลี้ยวหาตุ๊กตา',c:'ทิศทาง',map:['S.#','#.#','#.1'],dir:1,target:7,max:null,blocks:['F','L','R','P'],
+  hint:'<b>หันซ้าย/หันขวา</b> คือหมุนตัวอยู่กับที่ ดูลูกศรสีแดงว่าน้องหันหน้าไปทางไหน'},
+ {t:'ตัวเล็กก่อนเสมอ',c:'ตรรกะการเรียงลำดับ',map:['S.2.1'],dir:1,target:10,max:null,blocks:['F','L','R','P'],
+  hint:'ตุ๊กตาตัวใหญ่ต้องครอบตัวเล็ก จึงต้องเก็บ <b>หมายเลข 1</b> ก่อน เดินผ่านตัวอื่นได้ แต่อย่าเพิ่งเก็บ'},
+ {t:'ทางยาวไกล',c:'การทำซ้ำ (Loop)',map:['S.......1'],dir:1,target:3,max:3,blocks:['F','L','R','P','REP'],
+  hint:'ใช้ได้แค่ 3 บล็อก! ลองใช้ <b>ทำซ้ำ</b> แล้วใส่คำสั่งเดินไว้ข้างใน'},
+ {t:'บันไดวน',c:'หารูปแบบที่ซ้ำกัน',map:['S#####','..####','#..###','##..##','###..#','####1#'],dir:2,target:7,max:8,blocks:['F','L','R','P','REP'],
+  hint:'สังเกตว่าการเดินลงบันไดแต่ละขั้นใช้คำสั่งชุดเดิมซ้ำกัน'},
+ {t:'เก็บทีละตัว',c:'การทำซ้ำ + ลำดับ',map:['S.1.2.3.4'],dir:1,target:4,max:5,blocks:['F','L','R','P','REP'],
+  hint:'ตุ๊กตาวางห่างกันเท่า ๆ กัน ชุดคำสั่ง "เดิน เดิน เก็บ" ทำซ้ำได้ไหม?'},
+ {t:'ตัวเล็กอยู่ไกลสุด',c:'วางแผนก่อนลงมือ',map:['S.4.3.2.1'],dir:1,target:9,max:10,blocks:['F','L','R','P','REP'],
+  hint:'ต้องไปเก็บตัวที่ 1 ที่อยู่ไกลที่สุดก่อน แล้วค่อยเดินย้อนกลับมาเก็บตัวที่เหลือ'},
+ {t:'ซ้อนเหมือนตุ๊กตา',c:'ลูปซ้อนลูป (Nested Loop)',map:['S...1','.###.','.###.','.###.','3...2'],dir:1,target:5,max:6,blocks:['F','L','R','P','REP'],
+  hint:'บล็อก <b>ทำซ้ำ</b> ใส่ซ้อนไว้ในบล็อกทำซ้ำอีกอันได้ เหมือนตุ๊กตาแม่ลูกดกที่ซ้อนกันเป็นชั้น ๆ'},
+ {t:'เดินซิกแซก',c:'ลูปซ้อน + วางแผน',map:['S.1.2','####.','4.3..'],dir:1,target:9,max:10,blocks:['F','L','R','P','REP'],
+  hint:'ครึ่งแรกกับครึ่งหลังของเส้นทางเหมือนกันไหม? ถ้าเหมือน ลองให้ทำซ้ำทั้งชุด'},
+ {t:'ภารกิจสุดท้าย',c:'รวมทุกทักษะ',map:['S####','.4###','#.3##','##.2#','###.1'],dir:2,target:13,max:14,blocks:['F','L','R','P','REP'],
+  hint:'ตัวที่ 1 อยู่ล่างสุด! ลงบันไดไปเก็บให้ได้ก่อน แล้วปีนกลับขึ้นมาเก็บตัวที่ 2, 3, 4 ตามลำดับ'}
+];
+
+const BLOCK_INFO = {
+  F:{label:'เดินหน้า 1 ช่อง ⬆'},
+  L:{label:'หันซ้าย ↺'},
+  R:{label:'หันขวา ↻'},
+  P:{label:'เก็บตุ๊กตา 🎁'},
+  REP:{label:'ทำซ้ำ'}
+};
+const DOLL_COLORS = ['#e74c3c','#f39c12','#27ae60','#2f80d1','#8e44ad'];
+
+/* ---------------- ตัวช่วย ---------------- */
+const $ = id => document.getElementById(id);
+const store = {
+  get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},
+  set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+};
+const fmtTime = s => Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');
+const esc = s => String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function dollSVG(color){
+  return `<svg viewBox="0 0 40 50" xmlns="http://www.w3.org/2000/svg"><path d="M20 2a11 11 0 0 1 11 11c0 4-2 6-3 8c6 4 9 11 9 18c0 7-6 9-17 9s-17-2-17-9c0-7 3-14 9-18c-1-2-3-4-3-8A11 11 0 0 1 20 2z" fill="${color}" stroke="#7a2e12" stroke-width="1.5"/><circle cx="20" cy="14" r="7" fill="#ffe3c8"/><circle cx="17.5" cy="13.5" r="1" fill="#333"/><circle cx="22.5" cy="13.5" r="1" fill="#333"/><path d="M17.5 17q2.5 2 5 0" stroke="#c0392b" fill="none" stroke-width="1"/><circle cx="15" cy="16" r="1.3" fill="#ff9aa2"/><circle cx="25" cy="16" r="1.3" fill="#ff9aa2"/><ellipse cx="20" cy="35" rx="8" ry="7" fill="#fff" opacity=".85"/><circle cx="20" cy="35" r="3.5" fill="${color}"/></svg>`;
+}
+function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('show',s.id===id))}
+
+/* ---------------- ผู้เล่น & ความก้าวหน้า ---------------- */
+let player = store.get('ctdoll:player',null);
+const pkey = () => 'ctdoll:prog:'+player.name+'|'+player.cls+'|'+player.no;
+let progress = {};  // {levelIndex:{stars,time}}
+
+$('logo').innerHTML = [0.55,0.7,0.85,1].map((s,i)=>`<div style="height:${s*100}px">${dollSVG(DOLL_COLORS[i])}</div>`).join('').replace(/<svg/g,'<svg style="height:100%"');
+
+function login(){
+  const name=$('inName').value.trim(), cls=$('inClass').value.trim(), no=$('inNo').value.trim();
+  if(!name||!cls||!no){$('loginErr').textContent='กรุณากรอกชื่อ ชั้น/ห้อง และเลขที่ให้ครบ';return}
+  player={name,cls,no};
+  store.set('ctdoll:player',player);
+  enterSelect();
+}
+function enterSelect(){
+  progress = store.get(pkey(),{});
+  $('whoTag').textContent = '👤 '+player.name+' · '+player.cls+' เลขที่ '+player.no;
+  renderLevels(); show('select');
+  // ดึงความก้าวหน้าจาก Google Sheets (เผื่อเล่นจากเครื่องอื่น)
+  if(API_URL){
+    const q = new URLSearchParams({action:'progress',name:player.name,cls:player.cls,no:player.no});
+    fetch(API_URL+'?'+q).then(r=>r.json()).then(d=>{
+      if(!d||!d.ok) return;
+      let changed=false;
+      for(const k in d.levels){const i=+k-1, s=d.levels[k];
+        if(!progress[i]||progress[i].stars<s.stars){progress[i]={stars:s.stars,time:s.time};changed=true}}
+      if(changed){store.set(pkey(),progress);renderLevels()}
+    }).catch(()=>{});
+  }
+}
+function renderLevels(){
+  const unlocked = LEVELS.findIndex((_,i)=>!progress[i]);
+  const maxOpen = unlocked<0?LEVELS.length-1:unlocked;
+  $('levels').innerHTML = LEVELS.map((L,i)=>{
+    const st = progress[i]?progress[i].stars:0, lock=i>maxOpen;
+    return `<button class="lv ${lock?'lock':''} ${st?'done':''}" data-i="${i}" ${lock?'disabled':''}>
+      <b>${lock?'🔒':i+1}</b><div class="t">${L.t}</div><div class="c">${L.c}</div>
+      <div class="s">${[1,2,3].map(k=>`<span class="${k<=st?'on':''}">★</span>`).join('')}</div></button>`;
+  }).join('');
+  $('levels').querySelectorAll('.lv:not(.lock)').forEach(b=>b.onclick=()=>openLevel(+b.dataset.i));
+}
+$('btnLogin').onclick=login;
+$('inNo').addEventListener('keydown',e=>{if(e.key==='Enter')login()});
+$('btnLogout').onclick=()=>{store.set('ctdoll:player',null);player=null;$('inName').value=$('inClass').value=$('inNo').value='';show('login')};
+if(player){$('inName').value=player.name;$('inClass').value=player.cls;$('inNo').value=player.no}
+
+/* ---------------- สถานะด่าน ---------------- */
+let LV=0, level, W, H, state, program=[], attempts=0, t0=0, timerId=null, running=false, uid=1;
+
+function parseLevel(L){
+  const H=L.map.length, W=Math.max(...L.map.map(r=>r.length));
+  const grid=[], dolls={}; let sx=0,sy=0,total=0;
+  for(let y=0;y<H;y++){grid.push([]);for(let x=0;x<W;x++){
+    const ch=L.map[y][x]||'#';
+    grid[y].push(ch==='#'?1:0);
+    if(ch==='S'){sx=x;sy=y}
+    if(/[1-9]/.test(ch)){dolls[x+','+y]=+ch;total=Math.max(total,+ch)}
+  }}
+  return {W,H,grid,dolls,sx,sy,total};
+}
+function openLevel(i){
+  LV=i; level=parseLevel(LEVELS[i]); W=level.W; H=level.H;
+  program = store.get('ctdoll:code:'+i,[]); uid=1; reId(program);
+  attempts=0; t0=Date.now();
+  clearInterval(timerId); timerId=setInterval(()=>{$('pTime').textContent='⏱ '+fmtTime((Date.now()-t0)/1000)},1000);
+  $('pTime').textContent='⏱ 0:00';
+  $('lvTitle').textContent='ด่าน '+(i+1)+' · '+LEVELS[i].t;
+  $('lvHint').innerHTML='💡 '+LEVELS[i].hint;
+  renderPalette(); resetBoard(); renderProg(); updateCounters(); msg('');
+  show('game');
+}
+function reId(list){list.forEach(n=>{n.id=uid++;if(n.body)reId(n.body)})}
+function resetBoard(){
+  state={x:level.sx,y:level.sy,dir:LEVELS[LV].dir,got:0,taken:{}};
+  drawBoard();
+}
+function drawBoard(){
+  const b=$('board');
+  b.style.gridTemplateColumns=`repeat(${W},1fr)`;
+  b.style.gridTemplateRows=`repeat(${H},1fr)`;
+  b.style.aspectRatio=W+'/'+H;
+  let html='';
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+    const wall=level.grid[y][x], d=level.dolls[x+','+y];
+    html+=`<div class="cell ${wall?'wall':((x+y)%2?'b':'a')}">`+
+      (wall?'<span class="tree">🌳</span>':'')+
+      (d?`<div class="dollcell" id="d${x}_${y}" style="height:${40+d*12}%">${dollSVG(DOLL_COLORS[d-1])}<span class="num">${d}</span></div>`:'')+
+      (x===level.sx&&y===level.sy?'<span style="position:absolute;bottom:2px;left:4px;font-size:12px">🚩</span>':'')+
+      `</div>`;
+  }
+  html+=`<div id="hero"><div class="arr"></div><span class="face">🧒</span></div>`;
+  b.innerHTML=html; placeHero(); drawBag();
+}
+function placeHero(){
+  const h=$('hero');
+  h.style.width=(100/W)+'%'; h.style.height=(100/H)+'%';
+  h.style.left=(state.x*100/W)+'%'; h.style.top=(state.y*100/H)+'%';
+  h.querySelector('.arr').style.transform=`rotate(${state.dirTurns??state.dir*90}deg)`;
+}
+function drawBag(){
+  let h='<span class="lbl">ตุ๊กตาที่เก็บแล้ว</span>';
+  for(let k=1;k<=level.total;k++){
+    h+=`<span class="${k<=state.got?'':'ghost'}" style="display:inline-block;height:${24+k*6}px">${dollSVG(DOLL_COLORS[k-1]).replace('<svg','<svg style="height:100%"')}</span>`;
+  }
+  $('bag').innerHTML=h;
+}
+function msg(t,kind){const m=$('msg');m.className='msg '+(t?(kind||'bad'):'');m.innerHTML=t}
+
+/* ---------------- บล็อก: วาดและลากวาง ---------------- */
+function countBlocks(list){return list.reduce((s,n)=>s+1+(n.body?countBlocks(n.body):0),0)}
+function updateCounters(){
+  const n=countBlocks(program), L=LEVELS[LV];
+  $('pBlocks').textContent='🧩 '+n+(L.max?' / '+L.max:'')+' บล็อก';
+  $('pTry').textContent='🔁 ลอง '+attempts+' ครั้ง';
+  document.querySelectorAll('#palette .blk').forEach(b=>b.classList.toggle('dis',!!(L.max&&n>=L.max)));
+  store.set('ctdoll:code:'+LV,strip(program));
+}
+function strip(list){return list.map(n=>n.type==='REP'?{type:'REP',n:n.n,body:strip(n.body)}:{type:n.type})}
+function blockHTML(type,n){
+  if(type==='REP'){
+    const opts=[2,3,4,5,6,7,8,9,10].map(v=>`<option ${v===(n||2)?'selected':''}>${v}</option>`).join('');
+    return `<div class="hd">🔁 ทำซ้ำ <select>${opts}</select> ครั้ง</div><div class="body"></div><div class="ft"></div>`;
+  }
+  return BLOCK_INFO[type].label;
+}
+function renderPalette(){
+  const p=$('palette'); p.innerHTML='';
+  LEVELS[LV].blocks.forEach(t=>{
+    const el=document.createElement('div');
+    el.className='blk '+t; el.innerHTML=blockHTML(t,2);
+    if(t==='REP'){el.querySelector('select').disabled=true;el.querySelector('.body').style.minHeight='18px'}
+    el.addEventListener('pointerdown',e=>startDrag(e,{fromPalette:true,type:t}));
+    p.appendChild(el);
+  });
+}
+let slots=[];
+function renderProg(){
+  slots=[]; const root=$('prog'); root.innerHTML='';
+  renderList(program,root);
+  updateCounters();
+}
+function renderList(list,container){
+  const addSlot=(idx)=>{const s=document.createElement('div');s.className='slot';container.appendChild(s);slots.push({el:s,list,index:idx})};
+  list.forEach((node,i)=>{
+    addSlot(i);
+    const el=document.createElement('div');
+    el.className='blk '+node.type; el.dataset.id=node.id;
+    el.innerHTML=blockHTML(node.type,node.n);
+    if(node.type==='REP'){
+      const sel=el.querySelector('select');
+      sel.addEventListener('pointerdown',e=>e.stopPropagation());
+      sel.onchange=()=>{node.n=+sel.value;updateCounters()};
+      renderList(node.body,el.querySelector('.body'));
+    }
+    el.addEventListener('pointerdown',e=>{e.stopPropagation();startDrag(e,{node,list})});
+    container.appendChild(el);
+  });
+  addSlot(list.length);
+}
+let drag=null;
+function startDrag(e,info){
+  if(running||e.button>0) return;
+  e.preventDefault();
+  drag={...info,sx:e.clientX,sy:e.clientY,started:false,src:e.currentTarget};
+  window.addEventListener('pointermove',onMove);
+  window.addEventListener('pointerup',onUp,{once:true});
+  window.addEventListener('pointercancel',onUp,{once:true});
+}
+function canAdd(){const L=LEVELS[LV];return !L.max||countBlocks(program)<L.max}
+function beginDrag(){
+  drag.started=true;
+  if(drag.fromPalette){
+    if(!canAdd()){msg('ด่านนี้ใช้ได้ไม่เกิน '+LEVELS[LV].max+' บล็อก ลองใช้ “ทำซ้ำ” ช่วยลดจำนวนบล็อก');drag.blocked=true;return}
+    drag.node=drag.type==='REP'?{id:uid++,type:'REP',n:2,body:[]}:{id:uid++,type:drag.type};
+  }else{
+    drag.list.splice(drag.list.indexOf(drag.node),1);
+  }
+  const g=document.createElement('div');
+  g.className='blk '+drag.node.type+' ghostblk';
+  g.innerHTML=blockHTML(drag.node.type,drag.node.n);
+  document.body.appendChild(g); drag.ghost=g;
+  $('ws').classList.add('drag'); renderProg();
+}
+function onMove(e){
+  if(!drag) return;
+  if(!drag.started){if(Math.hypot(e.clientX-drag.sx,e.clientY-drag.sy)<6)return;beginDrag()}
+  if(drag.blocked) return;
+  drag.ghost.style.left=(e.clientX-20)+'px'; drag.ghost.style.top=(e.clientY-18)+'px';
+  slots.forEach(s=>s.el.classList.remove('on'));
+  drag.target=null;
+  if(overWs(e)){drag.target=nearestSlot(e.clientX,e.clientY);if(drag.target)drag.target.el.classList.add('on')}
+  // เลื่อนพื้นที่โปรแกรมอัตโนมัติเมื่อลากใกล้ขอบ
+  const r=$('ws').getBoundingClientRect();
+  if(e.clientY>r.bottom-30)$('ws').scrollTop+=8; else if(e.clientY<r.top+30)$('ws').scrollTop-=8;
+}
+function overWs(e){const r=$('ws').getBoundingClientRect();return e.clientX>=r.left&&e.clientX<=r.right&&e.clientY>=r.top&&e.clientY<=r.bottom}
+function nearestSlot(x,y){
+  let best=null,bd=1e9;
+  for(const s of slots){const r=s.el.getBoundingClientRect();
+    const dy=Math.abs(y-(r.top+r.height/2)), dx=x<r.left?(r.left-x):0;
+    const d=dy+dx*0.8; if(d<bd){bd=d;best=s}}
+  return best;
+}
+function onUp(e){
+  window.removeEventListener('pointermove',onMove);
+  const d=drag; drag=null;
+  if(!d) return;
+  $('ws').classList.remove('drag');
+  if(d.ghost) d.ghost.remove();
+  if(!d.started){
+    // แตะบล็อกในแถบคำสั่ง = ต่อท้ายโปรแกรม
+    if(d.fromPalette){
+      if(!canAdd()){msg('ด่านนี้ใช้ได้ไม่เกิน '+LEVELS[LV].max+' บล็อก ลองใช้ “ทำซ้ำ” ช่วยลดจำนวนบล็อก');return}
+      program.push(d.type==='REP'?{id:uid++,type:'REP',n:2,body:[]}:{id:uid++,type:d.type});
+      msg(''); renderProg();
+    }
+    return;
+  }
+  if(d.blocked) return;
+  if(d.target){d.target.list.splice(d.target.index,0,d.node);msg('')}
+  renderProg();
+}
+
+/* ---------------- รันโปรแกรม ---------------- */
+function* exec(list){for(const n of list){if(n.type==='REP'){for(let k=0;k<n.n;k++)yield* exec(n.body)}else yield n}}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const DX=[0,1,0,-1], DY=[-1,0,1,0];
+function stepDelay(){return [0,520,330,160][+$('speed').value]}
+
+async function run(){
+  if(running) return;
+  if(!program.length){msg('ลากบล็อกคำสั่งมาวางใน “โปรแกรมของฉัน” ก่อนนะ');return}
+  running=true; attempts++; updateCounters(); msg('');
+  resetBoard(); state.dirTurns=state.dir*90;
+  $('btnRun').disabled=true;
+  await sleep(250);
+  let fail=null, win=false, steps=0;
+  for(const n of exec(program)){
+    if(++steps>400){fail='โปรแกรมยาวเกินไป ลองตรวจบล็อกทำซ้ำอีกครั้ง';break}
+    const el=document.querySelector(`#prog .blk[data-id="${n.id}"]`); if(el)el.classList.add('run');
+    if(n.type==='F'){
+      const nx=state.x+DX[state.dir], ny=state.y+DY[state.dir];
+      if(nx<0||ny<0||nx>=W||ny>=H||level.grid[ny][nx]){
+        const h=$('hero');h.classList.remove('bump');void h.offsetWidth;h.classList.add('bump');
+        fail=(nx<0||ny<0||nx>=W||ny>=H)?'โอ๊ะ! ทางข้างหน้าตกขอบแผนที่':'โอ๊ะ! ชนต้นไม้ 🌳 ลองดูทิศที่น้องหันหน้าอีกครั้ง';
+      }else{state.x=nx;state.y=ny;placeHero()}
+    }else if(n.type==='L'){state.dir=(state.dir+3)%4;state.dirTurns-=90;placeHero()}
+    else if(n.type==='R'){state.dir=(state.dir+1)%4;state.dirTurns+=90;placeHero()}
+    else if(n.type==='P'){
+      const key=state.x+','+state.y, k=level.dolls[key];
+      if(!k||state.taken[key]) fail='ช่องนี้ไม่มีตุ๊กตาให้เก็บ';
+      else if(k!==state.got+1) fail=`ตุ๊กตาหมายเลข ${k} ตัวใหญ่กว่า ต้องเก็บ<b>หมายเลข ${state.got+1}</b> ใส่ไว้ข้างในก่อน!`;
+      else{state.got++;state.taken[key]=1;$('d'+state.x+'_'+state.y).classList.add('got');drawBag();
+        if(state.got===level.total) win=true;}
+    }
+    await sleep(stepDelay());
+    if(el)el.classList.remove('run');
+    if(fail||win) break;
+  }
+  if(!fail&&!win) fail='โปรแกรมจบแล้ว แต่ยังเก็บตุ๊กตาไม่ครบ ขาดอีก '+(level.total-state.got)+' ตัว';
+  running=false; $('btnRun').disabled=false;
+  if(win) finish(); else msg('❌ '+fail+' <span style="font-weight:400">— กด “กลับจุดเริ่ม” แล้วแก้บล็อกได้เลย</span>');
+}
+function starsFor(n){const t=LEVELS[LV].target;return n<=t?3:n<=t+3?2:1}
+function finish(){
+  clearInterval(timerId);
+  const blocks=countBlocks(program), stars=starsFor(blocks), time=Math.round((Date.now()-t0)/1000);
+  const prev=progress[LV];
+  if(!prev||stars>prev.stars||(stars===prev.stars&&time<prev.time)){progress[LV]={stars,time};store.set(pkey(),progress)}
+  $('winStars').innerHTML=[1,2,3].map(k=>`<span class="${k<=stars?'on':''}">★</span>`).join('');
+  $('winNote').textContent= stars===3?'สุดยอด! ใช้บล็อกน้อยที่สุดแล้ว':'ได้ 3 ดาวถ้าใช้ไม่เกิน '+LEVELS[LV].target+' บล็อก ลองหาวิธีที่สั้นกว่านี้ดูไหม?';
+  $('wBlocks').textContent=blocks; $('wTry').textContent=attempts; $('wTime').textContent=fmtTime(time);
+  $('wNext').style.display=LV<LEVELS.length-1?'':'none';
+  $('mWin').classList.add('show');
+  save({level:LV+1,stars,attempts,time,blocks});
+}
+function save(r){
+  if(!API_URL){$('saveNote').textContent='(ยังไม่ได้เชื่อมต่อ Google Sheets — คะแนนเก็บไว้ในเครื่องนี้)';return}
+  $('saveNote').textContent='กำลังบันทึกคะแนน…';
+  const body=JSON.stringify({action:'save',name:player.name,cls:player.cls,no:player.no,...r});
+  fetch(API_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body})
+    .then(()=>$('saveNote').textContent='✅ บันทึกคะแนนแล้ว')
+    .catch(()=>$('saveNote').textContent='⚠️ บันทึกไม่สำเร็จ ตรวจสอบอินเทอร์เน็ต');
+}
+
+/* ---------------- อันดับคะแนน ---------------- */
+async function openBoard(){
+  $('mBoard').classList.add('show');
+  if(!API_URL){$('boardBody').innerHTML='<p class="small">ยังไม่ได้เชื่อมต่อ Google Sheets<br>(ครูใส่ URL ของ Apps Script ในตัวแปร API_URL)</p>';return}
+  $('boardBody').textContent='กำลังโหลด…';
+  try{
+    const d=await (await fetch(API_URL+'?action=leaderboard')).json();
+    if(!d.ok||!d.rows.length){$('boardBody').innerHTML='<p class="small">ยังไม่มีใครเล่นจบด่าน มาเป็นคนแรกกัน!</p>';return}
+    $('boardBody').innerHTML='<table><tr><th>#</th><th>ชื่อ</th><th>ชั้น</th><th>ด่าน</th><th>⭐</th><th>เวลา</th></tr>'+
+      d.rows.map((r,i)=>{const me=player&&r.name===player.name&&r.cls===player.cls&&String(r.no)===String(player.no);
+        return `<tr class="${me?'me':''}"><td>${i<3?['🥇','🥈','🥉'][i]:i+1}</td><td>${esc(r.name)}</td><td>${esc(r.cls)}</td><td>${r.levels}</td><td>${r.stars}</td><td>${fmtTime(r.time)}</td></tr>`}).join('')+'</table>';
+  }catch(e){$('boardBody').innerHTML='<p class="small">โหลดอันดับไม่สำเร็จ ลองใหม่อีกครั้ง</p>'}
+}
+
+/* ---------------- ปุ่มต่าง ๆ ---------------- */
+$('btnRun').onclick=run;
+$('btnReset').onclick=()=>{if(!running){resetBoard();msg('')}};
+$('btnClear').onclick=()=>{if(!running){program=[];renderProg();resetBoard();msg('')}};
+$('btnBack').onclick=()=>{if(running)return;clearInterval(timerId);renderLevels();show('select')};
+$('btnBoard').onclick=openBoard;
+$('bClose').onclick=()=>$('mBoard').classList.remove('show');
+$('wAgain').onclick=()=>{$('mWin').classList.remove('show');openLevel(LV)};
+$('wNext').onclick=()=>{$('mWin').classList.remove('show');openLevel(LV+1)};
+
+if(player) enterSelect();
+</script>
+</body>
+</html>
