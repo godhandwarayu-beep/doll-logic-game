@@ -167,6 +167,7 @@ tr.me td{background:#fff3d6;font-weight:600}
     <span class="pill" id="pBlocks"></span>
     <span class="pill" id="pTry"></span>
     <span class="pill" id="pTime">⏱ 0:00</span>
+    <button class="btn alt" id="btnMute" title="เปิด/ปิดเสียง" style="padding:6px 12px">🔊</button>
   </div>
   <div class="gwrap">
     <div>
@@ -502,7 +503,7 @@ function stepDelay(){return [0,520,330,160][+$('speed').value]}
 async function run(){
   if(running) return;
   if(!program.length){msg('ลากบล็อกคำสั่งมาวางใน “โปรแกรมของฉัน” ก่อนนะ');return}
-  running=true; attempts++; updateCounters(); msg('');
+  running=true; attempts++; updateCounters(); msg(''); audio(); // ปลดล็อกเสียงตอนกดปุ่ม
   resetBoard(); state.dirTurns=state.dir*90;
   $('btnRun').disabled=true;
   await sleep(250);
@@ -543,9 +544,74 @@ function finish(){
   $('winNote').textContent= stars===3?'สุดยอด! ใช้บล็อกน้อยที่สุดแล้ว':'ได้ 3 ดาวถ้าใช้ไม่เกิน '+LEVELS[LV].target+' บล็อก ลองหาวิธีที่สั้นกว่านี้ดูไหม?';
   $('wBlocks').textContent=blocks; $('wTry').textContent=attempts; $('wTime').textContent=fmtTime(time);
   $('wNext').style.display=LV<LEVELS.length-1?'':'none';
-  $('mWin').classList.add('show');
   save({level:LV+1,stars,attempts,time,blocks});
+  // กลองรัว → เปิดหน้าต่างผลพร้อมเสียงแตรและพลุ
+  $('btnRun').disabled=true;
+  const wait=playWin(stars);
+  setTimeout(()=>{$('btnRun').disabled=false;$('mWin').classList.add('show');confetti()},wait);
 }
+
+/* ---------------- เสียงเอฟเฟ็กต์ (สร้างด้วย Web Audio ไม่ต้องใช้ไฟล์เสียง) ---------------- */
+const SFX={ctx:null,muted:store.get('ctdoll:mute',false)};
+function audio(){
+  try{
+    if(!SFX.ctx){const C=window.AudioContext||window.webkitAudioContext;if(!C)return null;SFX.ctx=new C()}
+    if(SFX.ctx.state==='suspended')SFX.ctx.resume();
+    return SFX.ctx;
+  }catch(e){return null}
+}
+function tone(c,f,t,d,type,vol,f2){
+  const o=c.createOscillator(),g=c.createGain();
+  o.type=type||'square'; o.frequency.setValueAtTime(f,t);
+  if(f2)o.frequency.exponentialRampToValueAtTime(f2,t+d);
+  g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(vol||.12,t+.012);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+d);
+  o.connect(g).connect(c.destination); o.start(t); o.stop(t+d+.05);
+}
+function noise(c,t,d,vol,hp){
+  const len=Math.ceil(c.sampleRate*d),buf=c.createBuffer(1,len,c.sampleRate),ch=buf.getChannelData(0);
+  for(let i=0;i<len;i++)ch[i]=Math.random()*2-1;
+  const s=c.createBufferSource(),f=c.createBiquadFilter(),g=c.createGain();
+  s.buffer=buf; f.type='highpass'; f.frequency.value=hp||1000;
+  g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(0.0001,t+d);
+  s.connect(f).connect(g).connect(c.destination); s.start(t); s.stop(t+d+.02);
+}
+function playWin(stars){
+  const c=SFX.muted?null:audio();
+  if(!c) return 500;
+  const t0=c.currentTime+.05;
+  // 1) กลองรัวเร่งจังหวะ + เสียงไต่ระดับ สร้างความลุ้น
+  let t=t0;
+  for(let i=0;i<20;i++){noise(c,t,.07,.04+i*.012,1500);tone(c,95,t,.06,'triangle',.05+i*.01);t+=.075-i*.0028}
+  tone(c,180,t0,1,'sawtooth',.035,1000);
+  const hit=t0+1.05;
+  // 2) ฉาบ + กลองใหญ่
+  noise(c,hit,1.4,.3,4000); tone(c,130,hit,.55,'sine',.55,40);
+  // 3) แตรฉลองชัยชนะ
+  [[392,0,.13],[523,.13,.13],[659,.26,.13],[784,.39,.3],[659,.72,.11],[784,.84,.8]]
+    .forEach(([f,dt,d])=>{tone(c,f,hit+dt,d,'square',.09);tone(c,f/2,hit+dt,d,'triangle',.12)});
+  [523,659,784,1047].forEach(f=>tone(c,f,hit+.84,1.3,'triangle',.07));
+  // 4) เสียงวิ้งตามจำนวนดาว (ตรงกับจังหวะดาวเด้งขึ้น)
+  for(let i=0;i<stars;i++){const ts=hit+.35+i*.15;tone(c,1300+i*260,ts,.35,'sine',.16,2600+i*500);tone(c,2600+i*520,ts+.05,.3,'sine',.06)}
+  return Math.max(0,(hit-c.currentTime)*1000);
+}
+function confetti(){
+  const cv=document.createElement('canvas');
+  cv.style.cssText='position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:120';
+  document.body.appendChild(cv);
+  const x=cv.getContext('2d'),W=cv.width=innerWidth,H=cv.height=innerHeight;
+  const cols=['#e74c3c','#f39c12','#27ae60','#2f80d1','#ffb400','#ff6680'];
+  const P=Array.from({length:140},()=>({x:W/2+(Math.random()-.5)*80,y:H*.45,vx:(Math.random()-.5)*16,vy:-Math.random()*15-5,
+    s:Math.random()*7+5,r:Math.random()*6,vr:(Math.random()-.5)*.4,c:cols[Math.random()*cols.length|0]}));
+  const end=performance.now()+2800;
+  (function f(now){
+    x.clearRect(0,0,W,H);
+    P.forEach(p=>{p.vy+=.45;p.vx*=.99;p.x+=p.vx;p.y+=p.vy;p.r+=p.vr;
+      x.save();x.translate(p.x,p.y);x.rotate(p.r);x.fillStyle=p.c;x.fillRect(-p.s/2,-p.s/4,p.s,p.s/2);x.restore()});
+    if(now<end)requestAnimationFrame(f);else cv.remove();
+  })(performance.now());
+}
+function setMute(m){SFX.muted=m;store.set('ctdoll:mute',m);$('btnMute').textContent=m?'🔇':'🔊'}
 function save(r){
   if(!API_URL){$('saveNote').textContent='(ยังไม่ได้เชื่อมต่อ Google Sheets — คะแนนเก็บไว้ในเครื่องนี้)';return}
   $('saveNote').textContent='กำลังบันทึกคะแนน…';
@@ -579,6 +645,8 @@ $('bClose').onclick=()=>$('mBoard').classList.remove('show');
 $('wAgain').onclick=()=>{$('mWin').classList.remove('show');openLevel(LV)};
 $('wNext').onclick=()=>{$('mWin').classList.remove('show');openLevel(LV+1)};
 
+$('btnMute').onclick=()=>setMute(!SFX.muted);
+setMute(SFX.muted);
 if(player) enterSelect();
 </script>
 </body>
